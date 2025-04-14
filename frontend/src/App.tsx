@@ -98,7 +98,6 @@ function App() {
   }
 
   const syncReadPositions = useCallback(async (servoIds: number[]) => {
-    const startTimeMs = performance.now();
     if (!port || !port.readable || !port.writable) {
         console.error('Port not available or not open when syncReadPositions called.');
         return;
@@ -118,7 +117,7 @@ function App() {
 
       // Read loop to accumulate data until expected length or timeout
       const startTime = Date.now();
-      const timeoutMs = 30;
+      const timeoutMs = 30; // Needs to timeout after 30ms to avoid blocking the main thread
 
       while (receivedData.length < totalExpectedLength && (Date.now() - startTime) < timeoutMs) {
         try {
