@@ -218,22 +218,18 @@ function App() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { deviceId: { exact: '0105c964da60ad97dd932d5a7cf3244eb786f5dfbe3d8f54ba318342e42c7f6f' } }
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.error('Error accessing camera:', err);
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { deviceId: { exact: ['0105c964da60ad97dd932d5a7cf3244eb786f5dfbe3d8f54ba318342e42c7f6f', 'bb937911d670b29999ca8fd0389510a478c9cc56b8855ec510a84eb6666dacc1'] } }
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
       }
+    } catch (err) {
+      console.error('Error accessing camera:', err);
     }
-
-    startCamera();
-  }, []);
+  };
 
   useEffect(() => {
     async function getDevices() {
@@ -251,6 +247,7 @@ function App() {
         <Button onClick={connectToSerial} className="p-2 m-2">Connect to Robot</Button>
         <Button onClick={disconnectSerial} className="p-2 m-2">Disconnect</Button>
         <Button onClick={() => pingServo(6)} disabled={!port} className="p-2 m-2">Ping Servo 6</Button>
+        <Button onClick={startCamera} className="p-2 m-2">Start Camera</Button>
       </div>
 
       <div className="p-4">
