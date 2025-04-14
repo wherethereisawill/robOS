@@ -19,8 +19,8 @@ WIP!!!
         - [ ] Add/remove camera flow.
         - [ ] Read servo ids, position, torque.
         - [ ] Write servo id.
-        - [ ] Config arms.
     - [ ] Teleop
+        - [ ] Config arms.
         - [ ] Choose leader/follower.
         - [ ] Enable/disable teleop (handle disable gracefully).
         - [ ] View servo positions of both arms in realtime.

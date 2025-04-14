@@ -13,12 +13,12 @@ function App() {
       const ports = await navigator.serial.getPorts();
       if (ports.length > 0) {
         const port = ports[0];
-        console.log('Found previously authorized port:', port);
+        console.log('Found previously authorized usb port:', port);
     
         try {
           if (!port.readable) {
             await port.open({ baudRate: 1000000 });
-            console.log('✅ Port opened successfully');
+            console.log('✅ USB port opened successfully');
           }
         } catch (error) {
           if (error instanceof DOMException && error.name === "InvalidStateError") {
@@ -37,7 +37,7 @@ function App() {
       const selectedPort = await navigator.serial.requestPort();
       await selectedPort.open({ baudRate: 1000000 });
       setPort(selectedPort);
-      console.log('✅ Serial port connected:', selectedPort);
+      console.log('✅ USB port connected:', selectedPort);
     } catch (error) {
       console.error('❌ Error opening serial port:', error);
     }
@@ -56,7 +56,7 @@ function App() {
         console.warn('No active writer/reader to release.');
       }
       await port.close();
-      console.log('✅ Serial port closed.');
+      console.log('✅ USB port closed.');
       setPort(null);
     } catch (error) {
       console.error('❌ Error closing serial port:', error);
@@ -77,7 +77,6 @@ function App() {
         return;
       }
       const data = new Uint8Array(value || []);
-      console.log('Received raw PING response:', data);
       if (data.length >= 6 && data[0] === 0xFF && data[1] === 0xFF && data[2] === servoId) {
         if (data[4] === 0) { 
             console.log(`✅ Servo ${servoId} replied to PING successfully!`);
@@ -113,7 +112,6 @@ function App() {
     try {
       const packet = buildSyncReadPacket(servoIds);
       await writer.write(packet);
-      console.log('Sent SYNC READ for servos:', servoIds, 'Packet:', packet);
 
       // Read loop to accumulate data until expected length or timeout
       const startTime = Date.now();
@@ -131,7 +129,6 @@ function App() {
             newData.set(receivedData);
             newData.set(value, receivedData.length);
             receivedData = newData;
-            console.log(`Received ${value.length} bytes, total ${receivedData.length}/${totalExpectedLength}`);
           }
         } catch(readError) {
             console.error("Error during read:", readError);
@@ -142,8 +139,6 @@ function App() {
       if (receivedData.length < totalExpectedLength) {
           console.warn(`SYNC READ timed out or received incomplete data. Expected ${totalExpectedLength}, got ${receivedData.length} bytes.`);
       }
-
-      console.log('Received raw SYNC READ response:', receivedData);
 
       // Parse the accumulated data
       let currentOffset = 0;
@@ -217,7 +212,6 @@ function App() {
     // Cleanup function to clear the interval when the component unmounts or port changes
     return () => {
       clearInterval(intervalId);
-      console.log('Cleared servo position polling interval.');
       isReading.current = false;
     };
   }, [port, syncReadPositions]);
@@ -245,7 +239,7 @@ function App() {
     async function getDevices() {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      console.log(videoDevices);
+      console.log('Video devices:', videoDevices);
     }
     getDevices();
   }, []);
