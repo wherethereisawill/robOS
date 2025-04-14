@@ -8,6 +8,7 @@ WIP!!!
 - Proof of concept:
     - [x] Connect to servo from usb.
     - [x] Read position from servo via usb.
+    - [ ] Connect & read camera
     - [ ] Record dataset.
     - [ ] Upload dataset to HF space.
     - [ ] Train policy on remote GPU.
