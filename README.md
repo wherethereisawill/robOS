@@ -3,7 +3,7 @@
 ## TODO
 
 - Proof of concept:
-    - [ ] Connect to servo from usb.
+    - [x] Connect to servo from usb.
     - [ ] Read position from servo via usb.
     - [ ] Record dataset.
     - [ ] Upload dataset to HF space.
