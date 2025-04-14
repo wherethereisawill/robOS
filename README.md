@@ -1,7 +1,7 @@
-# robot-os
+# robOS
 
 WIP!!!
-👉 https://robot-os.netlify.app/ 👈
+👉 https://rob-os.netlify.app 👈
 
 ## TODO
 

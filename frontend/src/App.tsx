@@ -242,7 +242,7 @@ function App() {
 
   return (
     <>
-      <h1 className="mt-10 mb-10 text-left text-4xl font-bold">Robot OS</h1>
+      <h1 className="mt-10 mb-10 text-left text-4xl font-bold">RobOS</h1>
       <div className="p-4">
         <Button onClick={connectToSerial} className="p-2 m-2">Connect to Robot</Button>
         <Button onClick={disconnectSerial} className="p-2 m-2">Disconnect</Button>
