@@ -42,6 +42,30 @@ function App() {
     }
   }
 
+  async function disconnectSerial() {
+    if (!port) return;
+  
+    try {
+      // If anything is reading/writing, release the locks first
+      const writer = port.writable?.getWriter();
+      const reader = port.readable?.getReader();
+  
+      try {
+        writer?.releaseLock();
+        reader?.releaseLock();
+      } catch (e) {
+        console.warn('No active writer/reader to release.');
+      }
+  
+      // Close the port
+      await port.close();
+      console.log('✅ Serial port closed.');
+      setPort(null);
+    } catch (error) {
+      console.error('❌ Error closing serial port:', error);
+    }
+  }  
+
   async function pingServo(servoId: number) {
     if (!port) return;
 
@@ -70,20 +94,9 @@ function App() {
     <>
       <h1 className="mt-10 mb-10 text-left text-4xl font-bold">Robot OS</h1>
       <div className="p-4">
-        <Button 
-          onClick={connectToSerial} 
-          className="p-2 m-2"
-        >
-          Connect to Robot
-        </Button>
-
-        <Button 
-          onClick={() => pingServo(6)} 
-          disabled={!port} 
-          className="p-2 m-2"
-        >
-          Ping Servo
-        </Button>
+        <Button onClick={connectToSerial} className="p-2 m-2">Connect to Robot</Button>
+        <Button onClick={disconnectSerial} className="p-2 m-2">Disconnect</Button>
+        <Button onClick={() => pingServo(6)} disabled={!port} className="p-2 m-2">Ping Servo</Button>
       </div>
     </>
   );
