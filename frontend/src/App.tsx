@@ -1,10 +1,12 @@
 import './App.css'
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button"
-import { buildPingPacket } from './utils/serialUtils';
+import { buildPingPacket, buildSyncReadPacket } from './utils/serialUtils';
 
 function App() {
   const [port, setPort] = useState<SerialPort | null>(null);
+  const [servoPositions, setServoPositions] = useState<Record<number, number | null>>({});
+  const isReading = useRef(false);
 
   useEffect(() => {
     async function tryReconnect() {
@@ -20,9 +22,8 @@ function App() {
           }
         } catch (error) {
           if (error instanceof DOMException && error.name === "InvalidStateError") {
-            // Safe to continue
           } else {
-            throw error; // Unexpected error
+            throw error;
           }
         }
         setPort(port);
@@ -34,7 +35,7 @@ function App() {
   async function connectToSerial() {
     try {
       const selectedPort = await navigator.serial.requestPort();
-      await selectedPort.open({ baudRate: 1000000 }); // Open at 1 Mbps
+      await selectedPort.open({ baudRate: 1000000 });
       setPort(selectedPort);
       console.log('✅ Serial port connected:', selectedPort);
     } catch (error) {
@@ -44,9 +45,7 @@ function App() {
 
   async function disconnectSerial() {
     if (!port) return;
-  
     try {
-      // If anything is reading/writing, release the locks first
       const writer = port.writable?.getWriter();
       const reader = port.readable?.getReader();
   
@@ -56,8 +55,6 @@ function App() {
       } catch (e) {
         console.warn('No active writer/reader to release.');
       }
-  
-      // Close the port
       await port.close();
       console.log('✅ Serial port closed.');
       setPort(null);
@@ -68,27 +65,163 @@ function App() {
 
   async function pingServo(servoId: number) {
     if (!port) return;
-
     const writer = port.writable?.getWriter();
     const reader = port.readable?.getReader();
-
     try {
       const packet = buildPingPacket(servoId);
       await writer?.write(packet);
-      const { value } = await reader!.read(); // Wait for servo reply
+      console.log('Sent PING to servo:', servoId);
+      const { value, done } = await reader!.read(); 
+      if (done) {
+        console.warn('Reader closed before PING response.');
+        return;
+      }
       const data = new Uint8Array(value || []);
-      if (data.length >= 6 && data[0] === 0xFF && data[1] === 0xFF) {
-        console.log('✅ Servo replied to PING!');
+      console.log('Received raw PING response:', data);
+      if (data.length >= 6 && data[0] === 0xFF && data[1] === 0xFF && data[2] === servoId) {
+        if (data[4] === 0) { 
+            console.log(`✅ Servo ${servoId} replied to PING successfully!`);
+        } else {
+            console.warn(`❌ Servo ${servoId} PING response indicates error: ${data[4]}`);
+        }
+      } else if (data.length > 0) {
+        console.warn(`❌ Invalid PING response from servo ${servoId}. Length: ${data.length}, Header: ${data[0]?.toString(16)}, ${data[1]?.toString(16)}`);
       } else {
-        console.warn('❌ Invalid PING response.');
+          console.warn(`❌ No PING response received from servo ${servoId}.`);
       }
     } catch (error) {
-      console.error('Failed to PING servo:', error);
+      console.error(`Failed to PING servo ${servoId}:`, error);
     } finally {
-      writer?.releaseLock();
-      reader?.releaseLock();
+      try { reader?.releaseLock(); } catch (e) { console.warn('Reader lock already released or cancelled.'); }
+      try { writer?.releaseLock(); } catch (e) { console.warn('Writer lock already released.'); }
     }
   }
+
+  const syncReadPositions = useCallback(async (servoIds: number[]) => {
+    const startTimeMs = performance.now();
+    if (!port || !port.readable || !port.writable) {
+        console.error('Port not available or not open when syncReadPositions called.');
+        return;
+    } 
+
+    const writer = port.writable.getWriter();
+    const reader = port.readable.getReader();
+    const expectedResponseLengthPerServo = 8;
+    const totalExpectedLength = servoIds.length * expectedResponseLengthPerServo;
+    let receivedData = new Uint8Array(0);
+    const positions: Record<number, number | null> = {};
+
+    try {
+      const packet = buildSyncReadPacket(servoIds);
+      await writer.write(packet);
+      console.log('Sent SYNC READ for servos:', servoIds, 'Packet:', packet);
+
+      // Read loop to accumulate data until expected length or timeout
+      const startTime = Date.now();
+      const timeoutMs = 30;
+
+      while (receivedData.length < totalExpectedLength && (Date.now() - startTime) < timeoutMs) {
+        try {
+          const { value, done } = await reader.read();
+          if (done) {
+            console.warn('Reader stream closed unexpectedly during SYNC READ.');
+            break;
+          }
+          if (value) {
+            const newData = new Uint8Array(receivedData.length + value.length);
+            newData.set(receivedData);
+            newData.set(value, receivedData.length);
+            receivedData = newData;
+            console.log(`Received ${value.length} bytes, total ${receivedData.length}/${totalExpectedLength}`);
+          }
+        } catch(readError) {
+            console.error("Error during read:", readError);
+            break; 
+        }
+      }
+
+      if (receivedData.length < totalExpectedLength) {
+          console.warn(`SYNC READ timed out or received incomplete data. Expected ${totalExpectedLength}, got ${receivedData.length} bytes.`);
+      }
+
+      console.log('Received raw SYNC READ response:', receivedData);
+
+      // Parse the accumulated data
+      let currentOffset = 0;
+      for (const servoId of servoIds) {
+        positions[servoId] = null;
+        let packetFound = false;
+        for (let i = currentOffset; i <= receivedData.length - expectedResponseLengthPerServo; i++) {
+            if (receivedData[i] === 0xFF && receivedData[i+1] === 0xFF && receivedData[i+2] === servoId) {
+                const packetSlice = receivedData.slice(i, i + expectedResponseLengthPerServo);
+                if (packetSlice[4] === 0) {
+                    const posLow = packetSlice[5];
+                    const posHigh = packetSlice[6];
+                    positions[servoId] = (posHigh << 8) | posLow;
+                    console.log(`✅ Parsed position for servo ${servoId}: ${positions[servoId]}`);
+                    currentOffset = i + expectedResponseLengthPerServo;
+                    packetFound = true;
+                    break;
+                } else {
+                    console.warn(`❌ Servo ${servoId} response indicates error: ${packetSlice[4]}`);
+                    currentOffset = i + expectedResponseLengthPerServo; 
+                    packetFound = true;
+                    break;
+                }
+            }
+        }
+        if (!packetFound && currentOffset < receivedData.length) {
+            console.warn(`Could not find valid response packet for servo ${servoId} starting from offset ${currentOffset}`);
+        }
+      }
+
+      setServoPositions(positions);
+
+    } catch (error) {
+      console.error('Failed SYNC READ:', error);
+    } finally {
+      try { 
+        if (reader && typeof reader.releaseLock === 'function') {
+          reader.releaseLock(); 
+        }
+      } catch(e) { console.warn('Reader lock already released or error releasing.'); }
+      try { 
+        if (writer && typeof writer.releaseLock === 'function') {
+          writer.releaseLock(); 
+        }
+      } catch(e) { console.warn('Writer lock already released or error releasing.'); }
+    }
+  }, [port]);
+
+  useEffect(() => {
+    if (!port) {
+      return;
+    }
+
+    const servoIdsToRead = [4, 6];
+
+    const intervalId = setInterval(async () => {
+      if (isReading.current) {
+        return;
+      }
+
+      isReading.current = true;
+      try {
+        await syncReadPositions(servoIdsToRead);
+      } catch (error) {
+        console.error("Error during scheduled syncRead:", error);
+      } finally {
+        isReading.current = false;
+      }
+    }, 33); // Poll at roughly ~30 Hz
+
+    // Cleanup function to clear the interval when the component unmounts or port changes
+    return () => {
+      clearInterval(intervalId);
+      console.log('Cleared servo position polling interval.');
+      isReading.current = false;
+    };
+  }, [port, syncReadPositions]);
 
   return (
     <>
@@ -96,7 +229,12 @@ function App() {
       <div className="p-4">
         <Button onClick={connectToSerial} className="p-2 m-2">Connect to Robot</Button>
         <Button onClick={disconnectSerial} className="p-2 m-2">Disconnect</Button>
-        <Button onClick={() => pingServo(6)} disabled={!port} className="p-2 m-2">Ping Servo</Button>
+        <Button onClick={() => pingServo(6)} disabled={!port} className="p-2 m-2">Ping Servo 6</Button>
+      </div>
+
+      <div className="p-4">
+        <h2 className="text-2xl font-semibold mb-2">Servo Positions:</h2>
+        <pre className="p-3 rounded">{JSON.stringify(servoPositions, null, 2)}</pre>
       </div>
     </>
   );
