@@ -2,14 +2,14 @@
 
 ## TODO
 
-- [ ] Proof of concept:
+- Proof of concept:
     - [ ] Connect to servo from usb.
     - [ ] Read position from servo via usb.
     - [ ] Record dataset.
     - [ ] Upload dataset to HF space.
     - [ ] Train policy on remote GPU.
 
-- [ ] Build full web app:
+- Build full web app:
     - [ ] Setup tab
         - [ ] Enable USB access.
         - [ ] Read board id.
