@@ -221,7 +221,7 @@ function App() {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { deviceId: { exact: ['0105c964da60ad97dd932d5a7cf3244eb786f5dfbe3d8f54ba318342e42c7f6f', 'bb937911d670b29999ca8fd0389510a478c9cc56b8855ec510a84eb6666dacc1'] } }
+        video: { deviceId: { exact: ['0105c964da60ad97dd932d5a7cf3244eb786f5dfbe3d8f54ba318342e42c7f6f', '7455bc4aa220d56b34888e8b362de115ecd894bb231819b579ec0c0525003a61'] } }
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
