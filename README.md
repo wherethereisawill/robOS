@@ -8,15 +8,15 @@ WIP!!!
 - Proof of concept:
     - [x] Connect to servo from usb.
     - [x] Read position from servo via usb.
-    - [ ] Connect & read camera
+    - [x] Connect & read camera
     - [ ] Record dataset.
     - [ ] Upload dataset to HF space.
     - [ ] Train policy on remote GPU.
 
 - Build full web app:
     - [ ] Setup tab
-        - [ ] Enable USB access.
-        - [ ] Read board id.
+        - [ ] Add/remove robot arm flow.
+        - [ ] Add/remove camera flow.
         - [ ] Read servo ids, position, torque.
         - [ ] Write servo id.
         - [ ] Config arms.

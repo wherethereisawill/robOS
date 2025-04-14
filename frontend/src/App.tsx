@@ -222,6 +222,34 @@ function App() {
     };
   }, [port, syncReadPositions]);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { deviceId: { exact: '0105c964da60ad97dd932d5a7cf3244eb786f5dfbe3d8f54ba318342e42c7f6f' } }
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+      }
+    }
+
+    startCamera();
+  }, []);
+
+  useEffect(() => {
+    async function getDevices() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      console.log(videoDevices);
+    }
+    getDevices();
+  }, []);
+
   return (
     <>
       <h1 className="mt-10 mb-10 text-left text-4xl font-bold">Robot OS</h1>
@@ -235,6 +263,9 @@ function App() {
         <h2 className="text-2xl font-semibold mb-2">Servo Positions:</h2>
         <pre className="p-3 rounded">{JSON.stringify(servoPositions, null, 2)}</pre>
       </div>
+      <div>
+        <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: 'auto' }} />
+    </div>
     </>
   );
 }
