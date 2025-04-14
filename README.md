@@ -4,7 +4,7 @@
 
 - Proof of concept:
     - [x] Connect to servo from usb.
-    - [ ] Read position from servo via usb.
+    - [x] Read position from servo via usb.
     - [ ] Record dataset.
     - [ ] Upload dataset to HF space.
     - [ ] Train policy on remote GPU.
