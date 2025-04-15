@@ -15,7 +15,7 @@ WIP!!!
     - [ ] Run inference on remote GPU.
 
 - Build full web app:
-    - [x] Homepage
+    - [x] Home
         - [x] Title
         - [x] Tabs
     - [ ] Setup tab
