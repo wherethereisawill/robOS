@@ -1,7 +1,7 @@
 import './App.css'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Setup from '@/components/setup';
-import Archive from '@/components/archive';
+import Setup from '@/components/Setup';
+import Archive from '@/components/Archive';
 
 function App() {
 
