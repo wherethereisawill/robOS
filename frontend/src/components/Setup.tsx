@@ -339,16 +339,18 @@ function Setup() {
                 <Button onClick={connectToSerial} className="rounded-full w-fit">Add robot</Button>
             </div>
             {ports.length > 0 ? (
-                 ports.map((port, index) => (
-                    <Card key={index} className="gap-y-0 mb-4"> {/* Added mb-4 for spacing */}
-                        <CardHeader>
-                            {/* Use getPortIdentifier for a more specific title */}
-                            <CardTitle>Robot connected</CardTitle>
-                            <CardDescription>{getPortIdentifier(port, index)}</CardDescription>
-                        </CardHeader>
-                        {/* Optionally add CardContent or CardFooter with more details or actions */}
-                    </Card>
-                 ))
+                <div className="grid grid-cols-2 gap-4">
+                    {ports.map((port, index) => (
+                        <Card key={index} className="gap-y-0 mb-4"> {/* Added mb-4 for spacing */}
+                            <CardHeader>
+                                {/* Use getPortIdentifier for a more specific title */}
+                                <CardTitle>Robot connected</CardTitle>
+                                <CardDescription>{getPortIdentifier(port, index)}</CardDescription>
+                            </CardHeader>
+                            {/* Optionally add CardContent or CardFooter with more details or actions */}
+                        </Card>
+                    ))}
+                </div>
             ) : (
                 <Card className="gap-y-0 mb-10">
                     <div className="w-[300px] mx-auto">
