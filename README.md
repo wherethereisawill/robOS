@@ -19,7 +19,11 @@ WIP!!!
         - [x] Title
         - [x] Tabs
     - [ ] Setup tab
-        - [x] Add/remove robot arm flow.
+        - [ ] Add/remove robot arm flow.
+            - [ ] Simplify.
+            - [ ] Fix layout of connected arms.
+            - [ ] Ping 6 servos to confirm fully configured.
+            - [ ] Display unique name.
         - [x] Add/remove camera flow.
         - [ ] Read servo ids, position, torque.
         - [ ] Write servo id.
