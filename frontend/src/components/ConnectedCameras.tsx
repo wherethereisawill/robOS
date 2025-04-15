@@ -24,6 +24,9 @@ function ConnectedCameras() {
 
     const listConnectedCameras = async () => {
         try {
+            // Request camera access to trigger permission prompt if needed
+            await navigator.mediaDevices.getUserMedia({ video: true });
+
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
             // Filter out already active cameras
@@ -32,7 +35,7 @@ function ConnectedCameras() {
             );
             setVideoDevices(availableCameras as MediaDevice[]);
         } catch (error) {
-            console.error('Error listing cameras:', error);
+            console.error('Error listing cameras or getting permissions:', error);
         }
     };
 

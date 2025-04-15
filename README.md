@@ -20,7 +20,7 @@ WIP!!!
         - [x] Tabs
     - [ ] Setup tab
         - [x] Add/remove robot arm flow.
-        - [ ] Add/remove camera flow.
+        - [x] Add/remove camera flow.
         - [ ] Read servo ids, position, torque.
         - [ ] Write servo id.
     - [ ] Teleop
