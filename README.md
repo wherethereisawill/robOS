@@ -9,9 +9,10 @@ WIP!!!
     - [x] Connect to servo from usb.
     - [x] Read position from servo via usb.
     - [x] Connect & read camera
-    - [ ] Record dataset.
-    - [ ] Upload dataset to HF space.
+    - [x] Record dataset.
+    - [x] Upload dataset to HF space.
     - [ ] Train policy on remote GPU.
+    - [ ] Run inference on remote GPU.
 
 - Build full web app:
     - [ ] Setup tab
