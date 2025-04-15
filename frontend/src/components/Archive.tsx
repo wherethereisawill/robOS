@@ -1,7 +1,7 @@
 // import './App.css'
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button"
-import { buildPingPacket, buildSyncReadPacket } from '../utils/serialUtils';
+import { buildPingPacket, buildSyncReadPacket } from '@/utils/serialUtils';
 
 function Archive() {
   const [port, setPort] = useState<SerialPort | null>(null);
