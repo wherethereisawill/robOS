@@ -1,0 +1,34 @@
+name: robot-os/act-so100-trainer
+description: Train the ACT model on a Hugging Face dataset using LeRobot
+
+input:
+  dataset_repo_id:
+    type: string
+    description: Hugging Face dataset name (e.g. PLB/simple-lego-pickup-mono)
+  hf_token:
+    type: string
+    description: Hugging Face token for dataset access and model upload
+  model_name:
+    type: string
+    description: What to name the model repo (e.g. my-act-model)
+  wandb_api_key:
+    type: string
+    description: (Optional) W&B API key for logging
+    default: ""
+
+output:
+  type: string
+  description: Hugging Face model ID (e.g. willnorris/my-act-model)
+
+run:
+  command:
+    - python
+    - train_and_upload.py
+    - --dataset_repo_id
+    - ${dataset_repo_id}
+    - --hf_token
+    - ${hf_token}
+    - --model_name
+    - ${model_name}
+    - --wandb_api_key
+    - ${wandb_api_key}

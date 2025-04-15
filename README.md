@@ -11,7 +11,7 @@ WIP!!!
     - [x] Connect & read camera
     - [x] Record dataset.
     - [x] Upload dataset to HF space.
-    - [ ] Train policy on remote GPU.
+    - [x] Train policy on remote GPU.
     - [ ] Run inference on remote GPU.
 
 - Build full web app:
