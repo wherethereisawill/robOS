@@ -15,16 +15,19 @@ WIP!!!
     - [ ] Run inference on remote GPU.
 
 - Build full web app:
+    - [ ] Homepage
+        - [x] Title
+        - [x] Tabs
     - [ ] Setup tab
-        - [ ] Add/remove robot arm flow.
+        - [x] Add/remove robot arm flow.
         - [ ] Add/remove camera flow.
         - [ ] Read servo ids, position, torque.
         - [ ] Write servo id.
     - [ ] Teleop
-        - [ ] Config arms.
         - [ ] Choose leader/follower.
         - [ ] Enable/disable teleop (handle disable gracefully).
         - [ ] View servo positions of both arms in realtime.
+        - [ ] Calibrate arms.
     - [ ] Datasets
         - [ ] View existing datasets.
         - [ ] Create new dataset/episode.
