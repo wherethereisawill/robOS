@@ -7,7 +7,8 @@ import { buildSyncReadPacket, buildSyncMovePacket } from "@/utils/serialUtils";
 import { Trash2 } from "lucide-react"; // Import Trash icon
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import EpisodeVideoPlayer from "./EpisodeVideoPlayer"; // Import the new component
+import EpisodeVideoPlayer from "./EpisodeVideoPlayer";
+const API_BASE = import.meta.env.VITE_API_BASE;
   
 // Define the structure for a recorded servo state
 interface RecordedServoState {
@@ -413,7 +414,7 @@ function RecordTab({ ports, activeCameras, streamsRef }: RecordTabProps) {
                 </div>
             </div>
             <Button onClick={() => {
-                fetch('http://127.0.0.1:8000/api/hello')
+                fetch(`${API_BASE}/api/hello`)
                     .then(response => response.json())
                     .then(data => console.log(data))
                     .catch(error => console.error('Error:', error));
