@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Setup from '@/components/Setup';
 import Archive from '@/components/Archive';
 import TeleopTab from '@/components/TeleopTab';
 import { PortInfo } from '@/types/serial';
+import { MediaDevice, ActiveCamera } from '@/types/camera';
 
 function App() {
   const [ports, setPorts] = useState<PortInfo[]>([]);
+
+  // --- Camera State ---
+  const [activeCameras, setActiveCameras] = useState<ActiveCamera[]>([]);
+  const streamsRef = useRef<Map<string, MediaStream>>(new Map());
 
   useEffect(() => {
     const handleDisconnect = (event: Event) => {
@@ -72,6 +77,63 @@ function App() {
     }
 }
 
+  // --- Camera Effects/Logic ---
+  // Cleanup camera streams on unmount
+  useEffect(() => {
+    // Return cleanup function
+    return () => {
+        console.log("App unmounting, cleaning up camera streams...");
+        streamsRef.current.forEach((stream, streamId) => {
+            stream.getTracks().forEach(track => track.stop());
+            console.log(`Stopped stream: ${streamId}`);
+        });
+        streamsRef.current.clear();
+        setActiveCameras([]); // Clear cameras state as well
+    };
+  }, []); // Empty dependency array ensures this runs only on mount and unmount
+
+  // Function to start a camera (passed down)
+  const startCamera = async (device: MediaDevice) => {
+    console.log("Attempting to start camera:", device.label);
+    // Prevent adding the same device multiple times
+    if (activeCameras.some(cam => cam.deviceId === device.deviceId)) {
+        console.warn(`Camera ${device.label} (${device.deviceId}) is already active.`);
+        return;
+    }
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: device.deviceId } }
+        });
+
+        const streamId = crypto.randomUUID();
+        streamsRef.current.set(streamId, stream);
+        console.log(`Stream ${streamId} added to ref for device ${device.deviceId}`);
+
+        const newCamera: ActiveCamera = {
+            deviceId: device.deviceId,
+            label: device.label,
+            kind: device.kind,
+            groupId: device.groupId,
+            streamId
+        };
+
+        setActiveCameras(prev => [...prev, newCamera]);
+        console.log("Active cameras updated:", [...activeCameras, newCamera]);
+
+    } catch (error) {
+        console.error(`Error starting camera ${device.label}:`, error);
+        // If starting fails, ensure we don't leave a dangling stream in the ref (though unlikely)
+        const potentiallyAddedStream = Array.from(streamsRef.current.entries())
+                                           .find(([_, s]) => s.getVideoTracks()[0]?.getSettings().deviceId === device.deviceId);
+        if (potentiallyAddedStream) {
+            const [streamId, stream] = potentiallyAddedStream;
+            stream.getTracks().forEach(track => track.stop());
+            streamsRef.current.delete(streamId);
+            console.log(`Cleaned up stream ${streamId} after start error.`);
+        }
+    }
+  };
+
   return (
     <>
       <h1 className="mt-10 mb-10 text-left text-4xl font-bold">RobOS</h1>
@@ -83,8 +145,22 @@ function App() {
           <TabsTrigger className="hover:cursor-pointer" value="policies">Policies</TabsTrigger>
           <TabsTrigger className="hover:cursor-pointer" value="archive">Archive</TabsTrigger>
       </TabsList>
-      <TabsContent value="setup"><Setup ports={ports} onConnectRobot={connectToSerial} /></TabsContent>
-      <TabsContent value="teleop"><TeleopTab ports={ports} /></TabsContent>
+      <TabsContent value="setup">
+          <Setup 
+              ports={ports} 
+              onConnectRobot={connectToSerial} 
+              activeCameras={activeCameras} 
+              streamsRef={streamsRef} 
+              onStartCamera={startCamera} 
+          />
+      </TabsContent>
+      <TabsContent value="teleop">
+          <TeleopTab 
+              ports={ports} 
+              activeCameras={activeCameras} 
+              streamsRef={streamsRef} 
+          />
+      </TabsContent>
       <TabsContent value="datasets">Datasets.</TabsContent>
       <TabsContent value="policies">Policies.</TabsContent>
       <TabsContent value="archive"><Archive /></TabsContent>

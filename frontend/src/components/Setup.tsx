@@ -1,14 +1,19 @@
 import ConnectedCameras from "./ConnectedCameras";
 import ConnectedRobots from "./ConnectedRobots";
 import { PortInfo } from "@/types/serial";
+import { MediaDevice, ActiveCamera } from "@/types/camera";
+import { RefObject } from "react";
 
 // Define props for Setup
 interface SetupProps {
     ports: PortInfo[];
     onConnectRobot: (robotType: 'leader' | 'follower') => Promise<void>;
+    activeCameras: ActiveCamera[];
+    streamsRef: RefObject<Map<string, MediaStream>>;
+    onStartCamera: (device: MediaDevice) => Promise<void>;
 }
 
-function Setup({ ports, onConnectRobot }: SetupProps) {
+function Setup({ ports, onConnectRobot, activeCameras, streamsRef, onStartCamera }: SetupProps) {
     // const syncReadPositions = useCallback(async (port: SerialPort, servoIds: number[]) => {
     //     if (!port) {
     //         console.error('No port provided');
@@ -126,7 +131,11 @@ function Setup({ ports, onConnectRobot }: SetupProps) {
     return (
         <>
             <ConnectedRobots ports={ports} onConnectRobot={onConnectRobot} />
-            <ConnectedCameras />
+            <ConnectedCameras 
+                activeCameras={activeCameras} 
+                streamsRef={streamsRef} 
+                onStartCamera={onStartCamera} 
+            />
         </>
       );
     }

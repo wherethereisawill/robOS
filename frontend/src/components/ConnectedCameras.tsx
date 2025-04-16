@@ -3,38 +3,61 @@ import { AspectRatio } from "@radix-ui/react-aspect-ratio";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, RefObject } from "react";
+import { MediaDevice, ActiveCamera } from "@/types/camera";
 
-interface MediaDevice {
-    deviceId: string;
-    label: string;
-    kind: string;
-    groupId: string;
+// Define props for ConnectedCameras
+interface ConnectedCamerasProps {
+    activeCameras: ActiveCamera[];
+    streamsRef: RefObject<Map<string, MediaStream>>;
+    onStartCamera: (device: MediaDevice) => Promise<void>;
 }
 
-interface ActiveCamera extends MediaDevice {
-    streamId: string;
+function CameraStream({ stream }: { stream: MediaStream }) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const videoElement = videoRef.current;
+        if (videoElement && stream) {
+            videoElement.srcObject = stream;
+            return () => {
+                if (videoElement.srcObject === stream) {
+                    videoElement.srcObject = null;
+                }
+            };
+        }
+    }, [stream]);
+
+    return (
+        <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="rounded-md object-cover w-full h-full"
+        />
+    );
 }
 
-function ConnectedCameras() {
+function ConnectedCameras({ activeCameras, streamsRef, onStartCamera }: ConnectedCamerasProps) {
     const [videoDevices, setVideoDevices] = useState<MediaDevice[]>([]);
-    const [activeCameras, setActiveCameras] = useState<ActiveCamera[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoadingCameras, setIsLoadingCameras] = useState(false);
-    const streamsRef = useRef<Map<string, MediaStream>>(new Map());
 
     const listConnectedCameras = async () => {
+        console.log("Listing available cameras...");
         setIsLoadingCameras(true);
+        setVideoDevices([]);
         try {
-            // Request camera access to trigger permission prompt if needed
             await navigator.mediaDevices.getUserMedia({ video: true });
 
             const devices = await navigator.mediaDevices.enumerateDevices();
-            const cameras = devices.filter(device => device.kind === 'videoinput');
-            // Filter out already active cameras
-            const availableCameras = cameras.filter(
+            const allCameras = devices.filter(device => device.kind === 'videoinput');
+            
+            const availableCameras = allCameras.filter(
                 camera => !activeCameras.some(active => active.deviceId === camera.deviceId)
             );
+            console.log("Available cameras found:", availableCameras);
             setVideoDevices(availableCameras as MediaDevice[]);
         } catch (error) {
             console.error('Error listing cameras or getting permissions:', error);
@@ -42,65 +65,6 @@ function ConnectedCameras() {
             setIsLoadingCameras(false);
         }
     };
-
-    const startCamera = async (device: MediaDevice) => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: device.deviceId } }
-            });
-
-            const streamId = crypto.randomUUID();
-            streamsRef.current.set(streamId, stream);
-
-            const newCamera: ActiveCamera = {
-                deviceId: device.deviceId,
-                label: device.label,
-                kind: device.kind,
-                groupId: device.groupId,
-                streamId
-            };
-
-            setActiveCameras(prev => [...prev, newCamera]);
-            setIsOpen(false);
-        } catch (error) {
-            console.error('Error starting camera:', error);
-        }
-    };
-
-    // Cleanup streams when component unmounts
-    useEffect(() => {
-        return () => {
-            streamsRef.current.forEach(stream => {
-                stream.getTracks().forEach(track => track.stop());
-            });
-            streamsRef.current.clear();
-        };
-    }, []);
-
-    function CameraStream({ stream }: { stream: MediaStream }) {
-        const videoRef = useRef<HTMLVideoElement>(null);
-    
-        useEffect(() => {
-            const videoElement = videoRef.current;
-            if (videoElement && stream) {
-                videoElement.srcObject = stream;
-                return () => {
-                    if (videoElement.srcObject === stream) {
-                        videoElement.srcObject = null;
-                    }
-                };
-            }
-        }, [stream]);
-    
-        return (
-            <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="rounded-md object-cover w-full h-full"
-            />
-        );
-    }
 
     return (
         <>
@@ -125,7 +89,10 @@ function ConnectedCameras() {
                                 videoDevices.map((device) => (
                                     <Button 
                                         key={device.deviceId}
-                                        onClick={() => startCamera(device)}
+                                        onClick={async () => {
+                                            await onStartCamera(device); 
+                                            setIsOpen(false);
+                                        }}
                                         className="rounded-full"
                                         variant="secondary"
                                     >
@@ -134,7 +101,7 @@ function ConnectedCameras() {
                                 ))
                             ) : (
                                 <div key="no-cameras" className="text-sm text-muted-foreground mt-0">
-                                    No additional cameras available.
+                                    No additional cameras available or found.
                                 </div>
                             )}
                         </div>
@@ -156,26 +123,35 @@ function ConnectedCameras() {
                     </Card>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {activeCameras.map((camera) => (
-                            <Card key={camera.deviceId} className="gap-y-5">
-                                <div className="w-[300px] mx-auto">
-                                    <AspectRatio ratio={1}>
-                                        <CameraStream 
-                                            key={camera.streamId} 
-                                            stream={streamsRef.current.get(camera.streamId)!} 
-                                        />
-                                    </AspectRatio>
-                                </div>
-                                <CardHeader>
-                                    <CardTitle>
-                                        {camera.label || `Camera ${camera.deviceId.slice(0, 4)}`}
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Connected
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-                        ))}
+                        {activeCameras.map((camera) => {
+                            const stream = streamsRef.current?.get(camera.streamId);
+                            return (
+                                <Card key={camera.deviceId} className="gap-y-5">
+                                    <div className="w-[300px] mx-auto">
+                                        <AspectRatio ratio={1}>
+                                            {stream ? (
+                                                <CameraStream 
+                                                    key={camera.streamId}
+                                                    stream={stream} 
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full bg-muted rounded-md">
+                                                    <p className="text-xs text-muted-foreground">Stream unavailable</p>
+                                                </div>
+                                            )}
+                                        </AspectRatio>
+                                    </div>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            {camera.label || `Camera ${camera.deviceId.slice(0, 4)}`}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Connected
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+                            );
+                        })}
                     </div>
                 )}
             </div>
