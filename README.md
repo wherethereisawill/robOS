@@ -22,6 +22,8 @@ WIP!!!
         - [x] Add/remove robot.
         - [x] Add/remove camera.
     - [ ] Teleop
+        - [ ] Read position of leader.
+        - [ ] Write position of follower.
         - [ ] Enable/disable teleop.
         - [ ] View servo positions of both arms in realtime.
         - [ ] Calibrate arms.

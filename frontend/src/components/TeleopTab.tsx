@@ -13,7 +13,6 @@ function TeleopTab({ ports, activeCameras }: TeleopTabProps) {
 
     return (
         <>
-            <h1>Teleop</h1>
             <p>Number of connected robots: {ports.length}</p>
             <p>Number of active cameras: {activeCameras.length}</p>
         </>

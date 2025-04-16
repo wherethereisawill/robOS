@@ -9,8 +9,6 @@ import { MediaDevice, ActiveCamera } from '@/types/camera';
 
 function App() {
   const [ports, setPorts] = useState<PortInfo[]>([]);
-
-  // --- Camera State ---
   const [activeCameras, setActiveCameras] = useState<ActiveCamera[]>([]);
   const streamsRef = useRef<Map<string, MediaStream>>(new Map());
 
@@ -36,7 +34,7 @@ function App() {
         // Ensure navigator.serial is available
         if (!navigator.serial) {
             console.error('Web Serial API not supported by this browser.');
-            alert('Web Serial API is not supported by this browser.'); // Inform user
+            alert('Web Serial API is not supported by this browser.');
             return;
         }
         const selectedPort = await navigator.serial.requestPort();
@@ -77,10 +75,8 @@ function App() {
     }
 }
 
-  // --- Camera Effects/Logic ---
   // Cleanup camera streams on unmount
   useEffect(() => {
-    // Return cleanup function
     return () => {
         console.log("App unmounting, cleaning up camera streams...");
         streamsRef.current.forEach((stream, streamId) => {
@@ -88,9 +84,9 @@ function App() {
             console.log(`Stopped stream: ${streamId}`);
         });
         streamsRef.current.clear();
-        setActiveCameras([]); // Clear cameras state as well
+        setActiveCameras([]);
     };
-  }, []); // Empty dependency array ensures this runs only on mount and unmount
+  }, []);
 
   // Function to start a camera (passed down)
   const startCamera = async (device: MediaDevice) => {
