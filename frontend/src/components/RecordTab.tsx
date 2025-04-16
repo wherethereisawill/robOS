@@ -4,6 +4,7 @@ import { RefObject, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { buildSyncReadPacket, buildSyncMovePacket } from "@/utils/serialUtils";
+import { Trash2 } from "lucide-react"; // Import Trash icon
 
 // Define the structure for a recorded frame
 interface RecordedFrame {
@@ -11,6 +12,9 @@ interface RecordedFrame {
     observation: { state: Record<number, number | null> };
     action: Record<number, number | null>;
 }
+
+// Define an Episode as an array of RecordedFrames
+type Episode = RecordedFrame[];
 
 // Define props for TeleopTab
 interface RecordTabProps {
@@ -31,20 +35,20 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
             console.error('Port streams are not available');
             return {};
         }
-        
+
         const writer = port.writable.getWriter();
         const reader = port.readable.getReader();
-    
+
         const expectedResponseLengthPerServo = 8;
         const totalExpectedLength = servoIds.length * expectedResponseLengthPerServo;
         let receivedData = new Uint8Array(0);
         const positions: Record<number, number | null> = {};
-    
+
         await writer.write(buildSyncReadPacket(servoIds));
-    
+
         const startTime = Date.now();
-        const timeoutMs = 30;
-    
+        const timeoutMs = 10; // Reduced timeout for potentially faster loops
+
         while (receivedData.length < totalExpectedLength && (Date.now() - startTime) < timeoutMs) {
             const { value, done } = await reader.read();
             if (done) break;
@@ -55,55 +59,61 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                 receivedData = newData;
             }
         }
-    
+
         let currentOffset = 0;
         for (const servoId of servoIds) {
             positions[servoId] = null;
+            // Slightly safer loop condition
             for (let i = currentOffset; i <= receivedData.length - expectedResponseLengthPerServo; i++) {
+                // Check header and ID
                 if (receivedData[i] === 0xFF && receivedData[i+1] === 0xFF && receivedData[i+2] === servoId) {
                     const packetSlice = receivedData.slice(i, i + expectedResponseLengthPerServo);
-                    if (packetSlice[4] === 0) {
+                    // Check for error byte (index 4)
+                    if (packetSlice[4] === 0) { // Assuming 0 means no error
                         const posLow = packetSlice[5];
                         const posHigh = packetSlice[6];
                         positions[servoId] = (posHigh << 8) | posLow;
+                    } else {
+                        console.warn(`Servo ${servoId} reported error: ${packetSlice[4]}`);
                     }
-                    currentOffset = i + expectedResponseLengthPerServo;
-                    break;
+                    currentOffset = i + expectedResponseLengthPerServo; // Move offset past this packet
+                    break; // Found packet for this servo, move to next servoId
                 }
             }
         }
-    
+
         reader.releaseLock();
         writer.releaseLock();
-    
+
         return positions;
     }, []);
 
     const syncMoveServos = useCallback(async (port: SerialPort, servosTargets: [number, number][]): Promise<void> => {
-        
+
         if (!port) {
           console.error("No port provided");
           return;
         }
-      
+
         if (!port.readable || !port.writable) {
           console.error("Port streams are not available");
           return;
         }
-      
+
         const packet = buildSyncMovePacket(servosTargets);
         // console.log("Sending SYNC MOVE:", packet.map(b => `0x${b.toString(16).padStart(2, '0')}`));
-      
+
         const writer = port.writable.getWriter();
         await writer.write(packet);
         writer.releaseLock();
-      
-        await new Promise(resolve => setTimeout(resolve, 10)); // sleep 10ms
+
+        await new Promise(resolve => setTimeout(resolve, 10));
       }, []);
 
     const [servoPositions, setServoPositions] = useState<Array<Record<number, number | null>>>([]);
     const [isRecording, setIsRecording] = useState(false);
-    const [recordedData, setRecordedData] = useState<RecordedFrame[]>([]);
+    const [recordedEpisodes, setRecordedEpisodes] = useState<Episode[]>([]);
+    const [currentEpisodeData, setCurrentEpisodeData] = useState<Episode>([]);
     const frameIndexRef = useRef<number>(0);
 
     // Function to handle reading leader and commanding follower
@@ -128,7 +138,8 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                         observation: { state: followerPositions },
                         action: leaderPositions
                     };
-                    setRecordedData(prev => [...prev, frameData]);
+                    // Append to the current episode's data
+                    setCurrentEpisodeData(prev => [...prev, frameData]);
                     frameIndexRef.current += 1;
                 }
                 // --- End Recording Logic ---
@@ -149,20 +160,22 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                     ports.map(async (portInfo) => {
                         if (portInfo.port) {
                             try {
+                                // Only read servos 4 and 6 for UI consistency
                                 const positions = await syncReadPositions(portInfo.port, [4, 6]);
                                 return positions;
                             } catch (error) {
                                 console.error(`Error fetching positions for ${portInfo.type}:`, error);
-                                return { 4: null, 6: null };
+                                return { 4: null, 6: null }; // Default state on error
                             }
                         } else {
-                            return { 4: null, 6: null };
+                            return { 4: null, 6: null }; // Default state if port not connected
                         }
                     })
                 );
 
             } catch (error) {
                 console.error("Error in syncLeaderToFollower loop:", error);
+                // Ensure UI state is consistent even on error
                 currentPositionsForUI = ports.map(() => ({ 4: null, 6: null }));
             }
         } else {
@@ -192,14 +205,14 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
 
     }, [ports, syncReadPositions, syncMoveServos, isRecording]);
 
+    // Interval effect for polling/syncing when NOT recording
     useEffect(() => {
         let intervalId: NodeJS.Timeout | null = null;
 
-        if (ports.length > 0 && isRecording) {
-            console.log("Starting recording interval...");
-            intervalId = setInterval(syncLeaderToFollower, 33.33);
+        // Only run polling if NOT recording and ports are available
+        if (ports.length === 2 && !isRecording) {
+            intervalId = setInterval(syncLeaderToFollower, 100); // Slower polling for UI
         } else {
-            console.log("Recording stopped or ports disconnected.");
             if (intervalId) {
                 clearInterval(intervalId);
             }
@@ -207,11 +220,43 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
 
         return () => {
             if (intervalId) {
-                console.log("Clearing recording interval.");
                 clearInterval(intervalId);
             }
         };
     }, [ports, isRecording, syncLeaderToFollower]);
+
+
+    // Interval effect specifically for recording
+     useEffect(() => {
+        let recordingIntervalId: NodeJS.Timeout | null = null;
+
+        if (isRecording) {
+            const leaderPortInfo = ports.find(p => p.type === 'leader');
+            const followerPortInfo = ports.find(p => p.type === 'follower');
+
+            if (leaderPortInfo?.port && followerPortInfo?.port) {
+                console.log("Starting recording interval...");
+                // Run recording sync at a higher frequency
+                recordingIntervalId = setInterval(syncLeaderToFollower, 33.33); // ~30Hz
+            } else {
+                 console.warn("Cannot start recording interval: Leader or Follower port missing.");
+                 setIsRecording(false); // Stop recording if ports aren't ready
+            }
+        } else {
+             // console.log("Recording is stopped.");
+             if (recordingIntervalId) {
+                 clearInterval(recordingIntervalId);
+             }
+        }
+
+        return () => {
+            if (recordingIntervalId) {
+                console.log("Clearing recording interval.");
+                clearInterval(recordingIntervalId);
+            }
+        };
+    }, [isRecording, ports, syncLeaderToFollower]); // Depend on isRecording and ports
+
 
     // Handler to toggle recording state
     const handleRecordClick = () => {
@@ -219,13 +264,30 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
         setIsRecording(prev => !prev);
 
         if (!wasRecording) { // About to start recording
-            console.log("Starting recording...");
-            setRecordedData([]);
+            console.log("Starting new episode recording...");
+            // Reset current episode data and frame index
+            setCurrentEpisodeData([]);
             frameIndexRef.current = 0;
         } else { // About to stop recording
-            console.log("Stopping recording. Final data:", recordedData);
+             // Check if the current episode has any data before saving
+            if (currentEpisodeData.length > 0) {
+                 console.log(`Stopping recording. Episode finished with ${currentEpisodeData.length} frames.`);
+                 // Add the completed episode to the list of episodes
+                setRecordedEpisodes(prev => [...prev, currentEpisodeData]);
+            } else {
+                console.log("Stopping recording. No frames recorded in this attempt.");
+            }
+             // Clear the current episode data regardless
+            setCurrentEpisodeData([]);
         }
     };
+
+    // Handler to delete an episode
+    const handleDeleteEpisode = (episodeIndex: number) => {
+        console.log(`Deleting episode ${episodeIndex + 1}`);
+        setRecordedEpisodes(prev => prev.filter((_, index) => index !== episodeIndex));
+    };
+
 
     return (
         <>
@@ -245,7 +307,7 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                                         ` Servo ${id}: ${pos ?? 'N/A'}`
                                     )).join(', ')
                                 ) : (
-                                    ' Loading...' // Or N/A if fetch completed with nulls
+                                    ' Loading...'
                                 )}
                             </li>
                         ))}
@@ -262,29 +324,35 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                     {isRecording ? "Stop Recording" : "Record new dataset"}
                 </Button>
             </div>
-            {!isRecording && recordedData.length > 0 && (
+
+            {/* Display recorded episodes */}
+            {recordedEpisodes.length > 0 && (
                 <div className="mt-4 p-4 border rounded bg-secondary text-secondary-foreground">
-                    <h3 className="text-lg font-semibold mb-2">Recorded Data (Last Session)</h3>
-                    <div className="overflow-auto max-h-96">
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr className="border-b">
-                                    <th className="p-2 text-left">Frame Index</th>
-                                    <th className="p-2 text-left">Observation State</th>
-                                    <th className="p-2 text-left">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recordedData.map((frame: RecordedFrame) => (
-                                    <tr key={frame.frame_index} className="border-b">
-                                        <td className="p-2">{frame.frame_index}</td>
-                                        <td className="p-2">{JSON.stringify(frame.observation.state)}</td>
-                                        <td className="p-2">{JSON.stringify(frame.action)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Recorded Episodes</h3>
+                    <ul className="space-y-2">
+                        {recordedEpisodes.map((episode, index) => (
+                            <li key={index} className="flex items-center justify-between p-2 border rounded bg-background">
+                                <span>Episode {index + 1} ({episode.length} frames)</span>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-red-500 hover:text-red-700"
+                                    onClick={() => handleDeleteEpisode(index)}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                    {/* Optional: Add button to clear all episodes */}
+                     <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => setRecordedEpisodes([])}
+                        >
+                            Clear All Episodes
+                    </Button>
                 </div>
             )}
         </>
