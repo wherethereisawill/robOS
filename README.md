@@ -14,22 +14,15 @@ WIP!!!
     - [x] Train policy on remote GPU.
     - [ ] Run inference on remote GPU.
 
-- Build full web app:
+- MVP:
     - [x] Home
         - [x] Title
         - [x] Tabs
     - [ ] Setup tab
-        - [ ] Add/remove robot arm flow.
-            - [ ] Simplify.
-            - [x] Fix layout of connected arms.
-            - [ ] Ping 6 servos to confirm fully configured.
-            - [ ] Display unique name.
-        - [x] Add/remove camera flow.
-        - [ ] Read servo ids, position, torque.
-        - [ ] Write servo id.
+        - [x] Add/remove robot.
+        - [x] Add/remove camera.
     - [ ] Teleop
-        - [ ] Choose leader/follower.
-        - [ ] Enable/disable teleop (handle disable gracefully).
+        - [ ] Enable/disable teleop.
         - [ ] View servo positions of both arms in realtime.
         - [ ] Calibrate arms.
     - [ ] Datasets
@@ -40,3 +33,10 @@ WIP!!!
         - [ ] Train a policy.
         - [ ] Link to Weights & Biases whilst training.
         - [ ] Run policy.
+
+- v1:
+    - [ ] Setup tab
+        - [ ] Read servo ids, position, torque.
+        - [ ] Write servo id.
+    - [ ] Teleop
+        - [ ] Handle disable gracefully.

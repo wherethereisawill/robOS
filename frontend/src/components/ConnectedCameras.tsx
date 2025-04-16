@@ -20,9 +20,11 @@ function ConnectedCameras() {
     const [videoDevices, setVideoDevices] = useState<MediaDevice[]>([]);
     const [activeCameras, setActiveCameras] = useState<ActiveCamera[]>([]);
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoadingCameras, setIsLoadingCameras] = useState(false);
     const streamsRef = useRef<Map<string, MediaStream>>(new Map());
 
     const listConnectedCameras = async () => {
+        setIsLoadingCameras(true);
         try {
             // Request camera access to trigger permission prompt if needed
             await navigator.mediaDevices.getUserMedia({ video: true });
@@ -36,6 +38,8 @@ function ConnectedCameras() {
             setVideoDevices(availableCameras as MediaDevice[]);
         } catch (error) {
             console.error('Error listing cameras or getting permissions:', error);
+        } finally {
+            setIsLoadingCameras(false);
         }
     };
 
@@ -111,27 +115,29 @@ function ConnectedCameras() {
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Select a camera</DialogTitle>
-                            <DialogDescription> 
-                                Choose one of the available cameras.
+                            <DialogDescription>
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-col gap-2">
-                            {videoDevices.map((device) => (
-                                <Button 
-                                    key={device.deviceId}
-                                    onClick={() => startCamera(device)}
-                                    className="rounded-full"
-                                    variant="secondary"
-                                >
-                                    {device.label || `Camera ${device.deviceId.slice(0, 4)}`}
-                                </Button>
-                            ))}
+                            {isLoadingCameras ? (
+                                <div className="text-sm text-muted-foreground">Loading...</div>
+                            ) : videoDevices.length > 0 ? (
+                                videoDevices.map((device) => (
+                                    <Button 
+                                        key={device.deviceId}
+                                        onClick={() => startCamera(device)}
+                                        className="rounded-full"
+                                        variant="secondary"
+                                    >
+                                        {device.label || `Camera ${device.deviceId.slice(0, 4)}`}
+                                    </Button>
+                                ))
+                            ) : (
+                                <div key="no-cameras" className="text-sm text-muted-foreground mt-0">
+                                    No additional cameras available.
+                                </div>
+                            )}
                         </div>
-                        {videoDevices.length === 0 && (
-                            <div key="no-cameras" className="text-sm text-muted-foreground mt-0">
-                                No additional cameras available.
-                            </div>
-                        )}
                     </DialogContent>
                 </Dialog>
             </div>
