@@ -412,6 +412,12 @@ function RecordTab({ ports, activeCameras, streamsRef }: RecordTabProps) {
                     </ul>
                 </div>
             </div>
+            <Button onClick={() => {
+                fetch('http://127.0.0.1:8000/api/hello')
+                    .then(response => response.json())
+                    .then(data => console.log(data))
+                    .catch(error => console.error('Error:', error));
+            }}>Test API</Button>
             <div className="flex flex-row items-center justify-between mb-2 mt-4">
                 <h2 className="text-2xl font-semibold mt-2 mb-2 text-left">Recorded episodes</h2>
                 <Button className="rounded-full w-fit" onClick={handleRecordClick} variant={isRecording ? "destructive" : "default"}>
