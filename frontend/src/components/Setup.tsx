@@ -1,7 +1,14 @@
 import ConnectedCameras from "./ConnectedCameras";
 import ConnectedRobots from "./ConnectedRobots";
+import { PortInfo } from "@/types/serial";
 
-function Setup() {
+// Define props for Setup
+interface SetupProps {
+    ports: PortInfo[];
+    onConnectRobot: (robotType: 'leader' | 'follower') => Promise<void>;
+}
+
+function Setup({ ports, onConnectRobot }: SetupProps) {
     // const syncReadPositions = useCallback(async (port: SerialPort, servoIds: number[]) => {
     //     if (!port) {
     //         console.error('No port provided');
@@ -118,7 +125,7 @@ function Setup() {
 
     return (
         <>
-            <ConnectedRobots />
+            <ConnectedRobots ports={ports} onConnectRobot={onConnectRobot} />
             <ConnectedCameras />
         </>
       );
