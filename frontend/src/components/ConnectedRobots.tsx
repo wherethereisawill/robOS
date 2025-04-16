@@ -5,9 +5,10 @@ import { Card, CardDescription } from "./ui/card"
 import { AspectRatio } from "@radix-ui/react-aspect-ratio"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Terminal } from "lucide-react"
 import { useState } from "react";
 import { PortInfo } from "@/types/serial";
+import { AlertCircle } from "lucide-react"
+
 
 // Define props for ConnectedRobots
 interface ConnectedRobotsProps {
@@ -39,10 +40,10 @@ function ConnectedRobots({ ports, onConnectRobot }: ConnectedRobotsProps) {
                             </DialogDescription>
                         </DialogHeader>
                         {ports.length != 2 && (
-                            <Alert>
-                                <Terminal className="h-4 w-4" />
-                                <AlertTitle>Unplug the arm you want to connect before continuing!</AlertTitle>
-                                <AlertDescription>
+                            <Alert className="bg-slate-50">
+                                <AlertCircle className="h-4 w-4 stroke-black" />
+                                <AlertTitle className="text-slate-950">Unplug the arm you want to connect before continuing!</AlertTitle>
+                                <AlertDescription className="text-slate-950">
                                     After selecting "Follower" or "Leader" your browser will display a list of available ports. Once the list is shown, plug in your arm and select it from the list.
                                 </AlertDescription>
                             </Alert>

@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import './App.css'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Setup from '@/components/Setup';
-import Archive from '@/components/Archive';
-import TeleopTab from '@/components/TeleopTab';
+import RecordTab from '@/components/RecordTab';
 import { PortInfo } from '@/types/serial';
 import { MediaDevice, ActiveCamera } from '@/types/camera';
 
@@ -136,10 +135,8 @@ function App() {
       <Tabs defaultValue="setup" className="w-full">
       <TabsList className="mb-4">
           <TabsTrigger className="hover:cursor-pointer" value="setup">Setup</TabsTrigger>
-          <TabsTrigger className="hover:cursor-pointer" value="teleop">Teleop</TabsTrigger>
-          <TabsTrigger className="hover:cursor-pointer" value="datasets">Datasets</TabsTrigger>
-          <TabsTrigger className="hover:cursor-pointer" value="policies">Policies</TabsTrigger>
-          <TabsTrigger className="hover:cursor-pointer" value="archive">Archive</TabsTrigger>
+          <TabsTrigger className="hover:cursor-pointer" value="record">Record</TabsTrigger>
+          <TabsTrigger className="hover:cursor-pointer" value="train">Train</TabsTrigger>
       </TabsList>
       <TabsContent value="setup">
           <Setup 
@@ -150,16 +147,14 @@ function App() {
               onStartCamera={startCamera} 
           />
       </TabsContent>
-      <TabsContent value="teleop">
-          <TeleopTab 
+      <TabsContent value="record">
+          <RecordTab 
               ports={ports} 
               activeCameras={activeCameras} 
               streamsRef={streamsRef} 
           />
       </TabsContent>
-      <TabsContent value="datasets">Datasets.</TabsContent>
-      <TabsContent value="policies">Policies.</TabsContent>
-      <TabsContent value="archive"><Archive /></TabsContent>
+      <TabsContent value="train">Train.</TabsContent>
       </Tabs>
     </>
   );
