@@ -437,10 +437,10 @@ function RecordTab({ ports, activeCameras, streamsRef }: RecordTabProps) {
                                         <CardDescription>{episode.servoStates.length} servo states recorded</CardDescription>
                                     </div>
                                     <AlertDialog>
-                                        <AlertDialogTrigger>
-                                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700">
+                                        <AlertDialogTrigger asChild className="text-red-500 hover:text-red-700 flex-shrink-0 p-2 rounded-full hover:bg-destructive/10">
+                                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 flex-shrink-0">
                                                 <Trash2 className="h-4 w-4" />
-                                            </Button>  
+                                            </Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
                                             <AlertDialogHeader>
@@ -458,7 +458,7 @@ function RecordTab({ ports, activeCameras, streamsRef }: RecordTabProps) {
                         ))}
                     </ul>
                     <AlertDialog>
-                        <AlertDialogTrigger>
+                        <AlertDialogTrigger asChild>
                             <Button variant="outline" size="sm" className="mt-4 rounded-full">
                                 Clear all episodes
                             </Button>
