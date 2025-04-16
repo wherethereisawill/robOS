@@ -1,9 +1,16 @@
 import { PortInfo } from "@/types/serial";
 import { ActiveCamera } from "@/types/camera";
-import { RefObject } from "react";
+import { RefObject, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { buildSyncReadPacket, buildSyncMovePacket } from "@/utils/serialUtils";
+
+// Define the structure for a recorded frame
+interface RecordedFrame {
+    frame_index: number;
+    observation: { state: Record<number, number | null> };
+    action: Record<number, number | null>;
+}
 
 // Define props for TeleopTab
 interface RecordTabProps {
@@ -96,56 +103,71 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
 
     const [servoPositions, setServoPositions] = useState<Array<Record<number, number | null>>>([]);
     const [isRecording, setIsRecording] = useState(false);
+    const [recordedData, setRecordedData] = useState<RecordedFrame[]>([]);
+    const frameIndexRef = useRef<number>(0);
 
-    // New function to handle reading leader and commanding follower
+    // Function to handle reading leader and commanding follower
     const syncLeaderToFollower = useCallback(async () => {
         const leaderPortInfo = ports.find(p => p.type === 'leader');
         const followerPortInfo = ports.find(p => p.type === 'follower');
 
-        let currentPositions: Array<Record<number, number | null>> = [];
+        let currentPositionsForUI: Array<Record<number, number | null>> = [];
 
         if (leaderPortInfo?.port && followerPortInfo?.port) {
             try {
-                // 1. Read positions from Leader
+                // 1. Read positions from Leader (becomes the action)
                 const leaderPositions = await syncReadPositions(leaderPortInfo.port, [4, 6]); // Assuming servos 4 and 6
 
-                // 2. Prepare target positions for Follower
+                // 2. Read positions from Follower (becomes the observation)
+                const followerPositions = await syncReadPositions(followerPortInfo.port, [4, 6]);
+
+                // --- Recording Logic ---
+                if (isRecording) {
+                    const frameData: RecordedFrame = {
+                        frame_index: frameIndexRef.current,
+                        observation: { state: followerPositions },
+                        action: leaderPositions
+                    };
+                    setRecordedData(prev => [...prev, frameData]);
+                    frameIndexRef.current += 1;
+                }
+                // --- End Recording Logic ---
+
+                // 3. Prepare target positions for Follower command
                 const targetPositions: [number, number][] = Object.entries(leaderPositions)
                     .filter(([_, pos]) => pos !== null)
                     .map(([id, pos]) => [parseInt(id, 10), pos as number]);
 
-                // 3. Command Follower if there are valid targets
+                // 4. Command Follower if there are valid targets
                 if (targetPositions.length > 0) {
                     await syncMoveServos(followerPortInfo.port, targetPositions);
                 }
 
-                // 4. Read current positions from *all* ports for UI update
-                // We read again after commanding to get potentially updated states
-                currentPositions = await Promise.all(
+                // 5. Read current positions from *all* ports for UI update
+                // Read again to show the most up-to-date state (esp. follower after move)
+                currentPositionsForUI = await Promise.all(
                     ports.map(async (portInfo) => {
                         if (portInfo.port) {
                             try {
-                                // Read positions (leader's might have changed slightly, follower's reflect command target)
-                                const positions = await syncReadPositions(portInfo.port, [4, 6]); 
+                                const positions = await syncReadPositions(portInfo.port, [4, 6]);
                                 return positions;
                             } catch (error) {
                                 console.error(`Error fetching positions for ${portInfo.type}:`, error);
-                                return { 4: null, 6: null }; // Default on error
+                                return { 4: null, 6: null };
                             }
                         } else {
-                            return { 4: null, 6: null }; // Default if port object missing
+                            return { 4: null, 6: null };
                         }
                     })
                 );
 
             } catch (error) {
                 console.error("Error in syncLeaderToFollower loop:", error);
-                // Set default state in case of error during leader read or follower command
-                 currentPositions = ports.map(() => ({ 4: null, 6: null }));
+                currentPositionsForUI = ports.map(() => ({ 4: null, 6: null }));
             }
         } else {
-             // If leader or follower not connected, just read whatever is connected
-             currentPositions = await Promise.all(
+             // If leader or follower not connected, just read whatever is connected for UI
+             currentPositionsForUI = await Promise.all(
                 ports.map(async (portInfo) => {
                     if (portInfo.port) {
                         try {
@@ -160,30 +182,49 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                     }
                 })
             );
+             // Cannot record if leader or follower is missing
+             if (isRecording) {
+                console.warn("Recording paused: Leader or Follower port not available.");
+             }
         }
 
-        setServoPositions(currentPositions);
+        setServoPositions(currentPositionsForUI);
 
-    }, [ports, syncReadPositions, syncMoveServos]);
+    }, [ports, syncReadPositions, syncMoveServos, isRecording]);
 
     useEffect(() => {
-        // Only run the effect if we have ports connected AND recording is active
-        if (ports.length > 0 && isRecording) { 
-            // Set up interval to sync leader to follower periodically
-            const intervalId = setInterval(syncLeaderToFollower, 33);
+        let intervalId: NodeJS.Timeout | null = null;
 
-            // Cleanup function to clear the interval
-            return () => clearInterval(intervalId);
+        if (ports.length > 0 && isRecording) {
+            console.log("Starting recording interval...");
+            intervalId = setInterval(syncLeaderToFollower, 33.33);
         } else {
-            // Clear positions if no ports are connected
-            setServoPositions([]);
+            console.log("Recording stopped or ports disconnected.");
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
         }
-        // Rerun effect if ports array, recording status, or control functions change
-    }, [ports, isRecording, syncLeaderToFollower]); 
+
+        return () => {
+            if (intervalId) {
+                console.log("Clearing recording interval.");
+                clearInterval(intervalId);
+            }
+        };
+    }, [ports, isRecording, syncLeaderToFollower]);
 
     // Handler to toggle recording state
     const handleRecordClick = () => {
+        const wasRecording = isRecording;
         setIsRecording(prev => !prev);
+
+        if (!wasRecording) { // About to start recording
+            console.log("Starting recording...");
+            setRecordedData([]);
+            frameIndexRef.current = 0;
+        } else { // About to stop recording
+            console.log("Stopping recording. Final data:", recordedData);
+        }
     };
 
     return (
@@ -211,16 +252,41 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                     </ul>
                 </div>
             </div>
-            <div className="flex flex-row items-center justify-between mb-2">
-                <h2 className="text-2xl font-semibold mt-2 mb-2 text-left">Datasets</h2>
-                <Button 
-                    className="rounded-full w-fit" 
+            <div className="flex flex-row items-center justify-between mb-2 mt-4">
+                <h2 className="text-2xl font-semibold mb-2 text-left">Datasets</h2>
+                <Button
+                    className="rounded-full w-fit"
                     onClick={handleRecordClick}
                     variant={isRecording ? "destructive" : "default"}
                 >
                     {isRecording ? "Stop Recording" : "Record new dataset"}
                 </Button>
             </div>
+            {!isRecording && recordedData.length > 0 && (
+                <div className="mt-4 p-4 border rounded bg-secondary text-secondary-foreground">
+                    <h3 className="text-lg font-semibold mb-2">Recorded Data (Last Session)</h3>
+                    <div className="overflow-auto max-h-96">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="border-b">
+                                    <th className="p-2 text-left">Frame Index</th>
+                                    <th className="p-2 text-left">Observation State</th>
+                                    <th className="p-2 text-left">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {recordedData.map((frame: RecordedFrame) => (
+                                    <tr key={frame.frame_index} className="border-b">
+                                        <td className="p-2">{frame.frame_index}</td>
+                                        <td className="p-2">{JSON.stringify(frame.observation.state)}</td>
+                                        <td className="p-2">{JSON.stringify(frame.action)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </>
       );
     }
