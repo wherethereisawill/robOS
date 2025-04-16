@@ -6,17 +6,24 @@ import { useCallback, useEffect, useState } from "react";
 import { buildSyncReadPacket, buildSyncMovePacket } from "@/utils/serialUtils";
 import { Trash2 } from "lucide-react"; // Import Trash icon
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import EpisodeVideoPlayer from "./EpisodeVideoPlayer"; // Import the new component
   
-
-// Define the structure for a recorded frame
-interface RecordedFrame {
-    frame_index: number;
+// Define the structure for a recorded servo state
+interface RecordedServoState {
+    frame_index: number; 
     observation: { state: Record<number, number | null> };
     action: Record<number, number | null>;
 }
 
-// Define an Episode as an array of RecordedFrames
-type Episode = RecordedFrame[];
+// Define an Episode's servo states
+type EpisodeServoStates = RecordedServoState[];
+
+// Define the structure for a recorded episode
+interface RecordedEpisode {
+    servoStates: EpisodeServoStates; 
+    videoUrl?: string; 
+}
 
 // Define props for TeleopTab
 interface RecordTabProps {
@@ -25,7 +32,7 @@ interface RecordTabProps {
     streamsRef: RefObject<Map<string, MediaStream>>;
 }
 
-function RecordTab({ ports, activeCameras }: RecordTabProps) {
+function RecordTab({ ports, activeCameras, streamsRef }: RecordTabProps) {
 
     const syncReadPositions = useCallback(async (port: SerialPort, servoIds: number[]) => {
         if (!port) {
@@ -113,9 +120,11 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
 
     const [servoPositions, setServoPositions] = useState<Array<Record<number, number | null>>>([]);
     const [isRecording, setIsRecording] = useState(false);
-    const [recordedEpisodes, setRecordedEpisodes] = useState<Episode[]>([]);
-    const [currentEpisodeData, setCurrentEpisodeData] = useState<Episode>([]);
+    const [recordedEpisodes, setRecordedEpisodes] = useState<RecordedEpisode[]>([]);
+    const currentEpisodeServoStatesRef = useRef<EpisodeServoStates>([]);
     const frameIndexRef = useRef<number>(0);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const videoChunksRef = useRef<Blob[]>([]);
 
     // Function to handle reading leader and commanding follower
     const syncLeaderToFollower = useCallback(async () => {
@@ -132,18 +141,19 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                 // 2. Read positions from Follower (becomes the observation)
                 const followerPositions = await syncReadPositions(followerPortInfo.port, [4, 6]);
 
-                // --- Recording Logic ---
+                // --- Recording Servo State Logic ---
                 if (isRecording) {
-                    const frameData: RecordedFrame = {
+                    // Ensure correct type here
+                    const servoStateData: RecordedServoState = {
                         frame_index: frameIndexRef.current,
                         observation: { state: followerPositions },
                         action: leaderPositions
                     };
-                    // Append to the current episode's data
-                    setCurrentEpisodeData(prev => [...prev, frameData]);
+                    // Push to the correctly named ref
+                    currentEpisodeServoStatesRef.current.push(servoStateData);
                     frameIndexRef.current += 1;
                 }
-                // --- End Recording Logic ---
+                // --- End Recording Servo State Logic ---
 
                 // 3. Prepare target positions for Follower command
                 const targetPositions: [number, number][] = Object.entries(leaderPositions)
@@ -262,24 +272,112 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
     // Handler to toggle recording state
     const handleRecordClick = () => {
         const wasRecording = isRecording;
-        setIsRecording(prev => !prev);
 
-        if (!wasRecording) { // About to start recording
-            console.log("Starting new episode recording...");
-            // Reset current episode data and frame index
-            setCurrentEpisodeData([]);
-            frameIndexRef.current = 0;
-        } else { // About to stop recording
-             // Check if the current episode has any data before saving
-            if (currentEpisodeData.length > 0) {
-                 console.log(`Stopping recording. Episode finished with ${currentEpisodeData.length} frames.`);
-                 // Add the completed episode to the list of episodes
-                setRecordedEpisodes(prev => [...prev, currentEpisodeData]);
-            } else {
-                console.log("Stopping recording. No frames recorded in this attempt.");
+        if (!wasRecording) { // --- Start Recording ---
+            const leaderPortInfo = ports.find(p => p.type === 'leader');
+            const followerPortInfo = ports.find(p => p.type === 'follower');
+            const firstActiveCamera = activeCameras.length > 0 ? activeCameras[0] : null;
+            const stream = firstActiveCamera && streamsRef.current ? streamsRef.current.get(firstActiveCamera.streamId) : null;
+
+            if (!leaderPortInfo?.port || !followerPortInfo?.port) {
+                console.error("Cannot start recording: Leader or Follower port missing.");
+                return; // Don't start recording
             }
-             // Clear the current episode data regardless
-            setCurrentEpisodeData([]);
+
+            console.log("Starting new episode recording (servo states & video)...");
+            currentEpisodeServoStatesRef.current = []; // Clear the ref
+            frameIndexRef.current = 0;
+            videoChunksRef.current = []; // Clear previous chunks
+            setIsRecording(true);
+
+            // --- MediaRecorder Setup ---
+            if (stream) {
+                try {
+                    const options = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                        ? { mimeType: 'video/webm;codecs=vp9' }
+                        : MediaRecorder.isTypeSupported('video/webm')
+                        ? { mimeType: 'video/webm' }
+                        : {}; 
+
+                    mediaRecorderRef.current = new MediaRecorder(stream, options);
+
+                    mediaRecorderRef.current.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            videoChunksRef.current.push(event.data);
+                        }
+                    };
+                    
+                    // --- onstop handler (corrected) ---
+                    mediaRecorderRef.current.onstop = () => {
+                        console.log(">>> MediaRecorder onstop triggered.");
+                        
+                        // Read directly from the ref - ensure correct type
+                        const finalServoStates: EpisodeServoStates = currentEpisodeServoStatesRef.current;
+                        console.log(`>>> Captured servo states from ref. Length: ${finalServoStates.length}`);
+
+                        console.log(">>> Processing video in onstop...");
+                        const videoBlob = new Blob(videoChunksRef.current, {
+                            type: mediaRecorderRef.current?.mimeType || 'video/webm'
+                        });
+                        const videoUrl = URL.createObjectURL(videoBlob);
+                        console.log(">>> Video URL created:", videoUrl);
+
+                        // Check the captured servo states and add episode if valid
+                        if (finalServoStates.length > 0) {
+                            console.log(`>>> About to call setRecordedEpisodes with ${finalServoStates.length} servo states.`);
+                            // Ensure the object being added matches RecordedEpisode structure
+                            const newEpisode: RecordedEpisode = { 
+                                servoStates: finalServoStates, 
+                                videoUrl: videoUrl 
+                            };
+                            setRecordedEpisodes(prevEpisodes => {
+                                console.log(`>>> Inside setRecordedEpisodes update. Prev length: ${prevEpisodes.length}`);
+                                const newEpisodesArray = [...prevEpisodes, newEpisode]; // Use the correctly typed object
+                                console.log(`>>> New episodes array length: ${newEpisodesArray.length}`);
+                                return newEpisodesArray;
+                            });
+                            console.log(`>>> Episode supposedly saved.`);
+                        } else {
+                            console.log(">>> No servo states recorded, discarding video.");
+                            URL.revokeObjectURL(videoUrl); // Clean up unused URL
+                        }
+                        
+                        // Clear the ref *after* processing
+                        console.log(">>> Clearing currentEpisodeServoStatesRef.");
+                        currentEpisodeServoStatesRef.current = []; 
+
+                        mediaRecorderRef.current = null; 
+                    };
+                    // --- End onstop handler ---
+
+                    mediaRecorderRef.current.start(100); 
+                    console.log("MediaRecorder started.");
+
+                } catch (error) {
+                    console.error("Error setting up MediaRecorder:", error);
+                    mediaRecorderRef.current = null;
+                }
+            } else {
+                console.warn("No active camera stream found. Recording servo states only.");
+            }
+            // --- End MediaRecorder Setup ---
+
+        } else { // --- Stop Recording ---
+            console.log("Stopping recording attempt...");
+            setIsRecording(false); // Stop the syncLeaderToFollower interval first
+
+            // --- Stop MediaRecorder ---
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+                console.log("Requesting MediaRecorder stop...");
+                mediaRecorderRef.current.stop();
+                // The rest of the saving logic happens in the 'onstop' handler
+            } else {
+                 // If there was no recorder or it wasn't recording, just clear the ref.
+                 // The 'onstop' handler is responsible for saving successful recordings.
+                 console.log("MediaRecorder was not active or failed. Clearing temporary servo states ref if any.");
+                 currentEpisodeServoStatesRef.current = []; // Clear ref (Corrected placement)
+            }
+            // --- End Stop MediaRecorder ---
         }
     };
 
@@ -288,7 +386,6 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
         console.log(`Deleting episode ${episodeIndex + 1}`);
         setRecordedEpisodes(prev => prev.filter((_, index) => index !== episodeIndex));
     };
-
 
     return (
         <>
@@ -327,20 +424,56 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                         {recordedEpisodes.map((episode, index) => (
                             <Card key={index}>
                                 <CardHeader className="flex flex-row items-center justify-between">
-                                    <div className="text-left">
+                                    {/* Video Thumbnail using the new component */}
+                                    {episode.videoUrl && (
+                                        <EpisodeVideoPlayer 
+                                            src={episode.videoUrl}
+                                            className="w-40 h-40 object-cover rounded-md mr-4 bg-muted"
+                                        />
+                                    )}
+                                    {/* Episode Info */}
+                                    <div className="flex-grow text-left">
                                         <CardTitle>Episode {index + 1}</CardTitle>
-                                        <CardDescription>{episode.length} frames</CardDescription>
+                                        <CardDescription>{episode.servoStates.length} servo states recorded</CardDescription>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700" onClick={() => handleDeleteEpisode(index)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger>
+                                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700">
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>  
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                                                <AlertDialogAction className="rounded-full" onClick={() => handleDeleteEpisode(index)}>Delete episode</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </CardHeader>
                           </Card>
                         ))}
                     </ul>
-                     <Button variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => setRecordedEpisodes([])}>
-                            Clear all episodes
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger>
+                            <Button variant="outline" size="sm" className="mt-4 rounded-full">
+                                Clear all episodes
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="rounded-full" onClick={() => setRecordedEpisodes([])}>Delete all episodes</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             )}
         </>
