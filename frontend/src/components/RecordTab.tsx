@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { buildSyncReadPacket, buildSyncMovePacket } from "@/utils/serialUtils";
 import { Trash2 } from "lucide-react"; // Import Trash icon
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+  
 
 // Define the structure for a recorded frame
 interface RecordedFrame {
@@ -101,7 +103,6 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
         }
 
         const packet = buildSyncMovePacket(servosTargets);
-        // console.log("Sending SYNC MOVE:", packet.map(b => `0x${b.toString(16).padStart(2, '0')}`));
 
         const writer = port.writable.getWriter();
         await writer.write(packet);
@@ -315,43 +316,30 @@ function RecordTab({ ports, activeCameras }: RecordTabProps) {
                 </div>
             </div>
             <div className="flex flex-row items-center justify-between mb-2 mt-4">
-                <h2 className="text-2xl font-semibold mb-2 text-left">Datasets</h2>
-                <Button
-                    className="rounded-full w-fit"
-                    onClick={handleRecordClick}
-                    variant={isRecording ? "destructive" : "default"}
-                >
-                    {isRecording ? "Stop Recording" : "Record new dataset"}
+                <h2 className="text-2xl font-semibold mt-2 mb-2 text-left">Recorded episodes</h2>
+                <Button className="rounded-full w-fit" onClick={handleRecordClick} variant={isRecording ? "destructive" : "default"}>
+                    {isRecording ? "Stop Recording" : "Record new episode"}
                 </Button>
             </div>
-
-            {/* Display recorded episodes */}
             {recordedEpisodes.length > 0 && (
-                <div className="mt-4 p-4 border rounded bg-secondary text-secondary-foreground">
-                    <h3 className="text-lg font-semibold mb-2">Recorded Episodes</h3>
+                <div>
                     <ul className="space-y-2">
                         {recordedEpisodes.map((episode, index) => (
-                            <li key={index} className="flex items-center justify-between p-2 border rounded bg-background">
-                                <span>Episode {index + 1} ({episode.length} frames)</span>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-red-500 hover:text-red-700"
-                                    onClick={() => handleDeleteEpisode(index)}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </li>
+                            <Card key={index}>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <div className="text-left">
+                                        <CardTitle>Episode {index + 1}</CardTitle>
+                                        <CardDescription>{episode.length} frames</CardDescription>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700" onClick={() => handleDeleteEpisode(index)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </CardHeader>
+                          </Card>
                         ))}
                     </ul>
-                    {/* Optional: Add button to clear all episodes */}
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-4"
-                        onClick={() => setRecordedEpisodes([])}
-                        >
-                            Clear All Episodes
+                     <Button variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => setRecordedEpisodes([])}>
+                            Clear all episodes
                     </Button>
                 </div>
             )}
