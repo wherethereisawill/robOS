@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { buildSyncReadPacket, buildSyncMovePacket } from "@/utils/serialUtils";
 import { Trash2 } from "lucide-react"; // Import Trash icon
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
   
 
 // Define the structure for a recorded frame
