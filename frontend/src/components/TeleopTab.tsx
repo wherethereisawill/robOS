@@ -9,7 +9,7 @@ interface TeleopTabProps {
     streamsRef: RefObject<Map<string, MediaStream>>;
 }
 
-function TeleopTab({ ports, activeCameras, streamsRef }: TeleopTabProps) {
+function TeleopTab({ ports, activeCameras }: TeleopTabProps) {
 
     return (
         <>
