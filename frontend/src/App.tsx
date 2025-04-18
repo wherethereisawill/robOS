@@ -3,6 +3,7 @@ import './App.css'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Setup from '@/components/Setup';
 import RecordTab from '@/components/RecordTab';
+import RecordTabV2 from '@/components/RecordTabV2';
 import { PortInfo } from '@/types/serial';
 import { MediaDevice, ActiveCamera } from '@/types/camera';
 
@@ -136,6 +137,7 @@ function App() {
       <TabsList className="mb-4">
           <TabsTrigger className="hover:cursor-pointer" value="setup">Setup</TabsTrigger>
           <TabsTrigger className="hover:cursor-pointer" value="record">Record</TabsTrigger>
+          <TabsTrigger className="hover:cursor-pointer" value="recordv2">Record v2</TabsTrigger>
           <TabsTrigger className="hover:cursor-pointer" value="train">Train</TabsTrigger>
       </TabsList>
       <TabsContent value="setup">
@@ -153,6 +155,9 @@ function App() {
               activeCameras={activeCameras} 
               streamsRef={streamsRef} 
           />
+      </TabsContent>
+      <TabsContent value="recordv2">
+        <RecordTabV2 />
       </TabsContent>
       <TabsContent value="train">Train.</TabsContent>
       </Tabs>
