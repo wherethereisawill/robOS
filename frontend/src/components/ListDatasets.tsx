@@ -22,7 +22,11 @@ interface Dataset {
     tags: string[];
 }
 
-function ListDatasets() {
+interface ListDatasetsProps {
+    onDatasetSelect: (datasetName: string) => void;
+}
+
+function ListDatasets({ onDatasetSelect }: ListDatasetsProps) {
     const [datasets, setDatasets] = useState<Dataset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const token = getToken();
@@ -30,25 +34,49 @@ function ListDatasets() {
     useEffect(() => {
         if (!token) return;
 
-        const fetchDatasets = async () => {
+        const fetchUserAndDatasets = async () => {
             try {
-                const response = await fetch(
-                    "https://huggingface.co/api/datasets?author=willnorris&sort=createdAt&direction=-1&limit=50",
+                // First fetch the user's name
+                const userResponse = await fetch(
+                    "https://huggingface.co/api/whoami-v2",
                     {
                         method: "GET",
-                        headers: {"Authorization": `Bearer ${token}`}
+                        headers: {
+                            "Authorization": `Bearer ${token}`,
+                            "Content-Type": "application/json"
+                        },
+                        mode: "cors"
                     }
                 );
-                const data = await response.json();
-                setDatasets(data);
+                const userData = await userResponse.json();
+
+                // Then fetch their datasets
+                const datasetsResponse = await fetch(
+                    `https://huggingface.co/api/datasets?author=${userData.name}&sort=createdAt&direction=-1&limit=50`,
+                    {
+                        method: "GET",
+                        headers: {
+                            "Authorization": `Bearer ${token}`,
+                            "Content-Type": "application/json"
+                        },
+                        mode: "cors"
+                    }
+                );
+                const datasetsData = await datasetsResponse.json();
+                setDatasets(datasetsData);
+                
+                // Automatically select the first dataset if available
+                if (datasetsData.length > 0) {
+                    onDatasetSelect(datasetsData[0].id);
+                }
             } catch (error) {
-                console.error("Error fetching datasets:", error);
+                console.error("Error fetching data:", error);
             } finally {
                 setIsLoading(false);
             }
         };
-        fetchDatasets();
-    }, [token]);
+        fetchUserAndDatasets();
+    }, [token, onDatasetSelect]);
 
     return (
         <div>
@@ -61,17 +89,22 @@ function ListDatasets() {
                     {isLoading ? (
                         <div className="text-center py-4">Loading...</div>
                     ) : datasets.length === 0 ? (
-                        <div className="text-center py-4">Create a dataset to get started</div>
+                        <div className="text-center py-4">No datasets yet... Create one!</div>
                     ) : (
                         datasets.map((dataset) => {
+                            const datasetName = dataset.id.split('/')[1];
                             return (
                                 <Card key={dataset.id}>
                                     <CardHeader className="flex flex-row items-center justify-between">
                                         <div className="flex-grow text-left space-y-2">
-                                            <CardTitle>{dataset.id.split('/')[1]}</CardTitle>
+                                            <CardTitle>{datasetName}</CardTitle>
                                             <CardDescription>{dataset.createdAt.split('T')[0]}</CardDescription>
                                         </div>
-                                        <Button variant="outline" size="icon">
+                                        <Button 
+                                            variant="outline" 
+                                            size="icon"
+                                            onClick={() => onDatasetSelect(dataset.id)}
+                                        >
                                             <ChevronRight />
                                         </Button>
                                     </CardHeader>

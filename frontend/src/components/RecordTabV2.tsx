@@ -1,9 +1,11 @@
 import ListDatasets from "./ListDatasets";
 import ListEpisodes from "./ListEpisodes";
 import { getToken } from "@/utils/token";
+import { useState } from "react";
 
 function RecordTabV2() {
     const token = getToken();
+    const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
 
     if (!token) {
         return (
@@ -18,10 +20,10 @@ function RecordTabV2() {
     return (
         <div className="flex gap-8">
             <div className="w-1/3">
-                <ListDatasets />
+                <ListDatasets onDatasetSelect={setSelectedDataset} />
             </div>
             <div className="w-2/3">
-                <ListEpisodes />
+                <ListEpisodes datasetName={selectedDataset || ""} />
             </div>
         </div>
     );
