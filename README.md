@@ -16,8 +16,8 @@ WIP!!!
 
 - MVP:
     - [x] Home
-        - [x] Title
-        - [x] Tabs
+        - [x] Title.
+        - [x] Tabs.
     - [ ] Setup tab
         - [x] Add/remove robot.
         - [x] Add/remove camera.
