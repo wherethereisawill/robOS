@@ -28,7 +28,7 @@ function ConnectedRobots({ ports, onConnectRobot }: ConnectedRobotsProps) {
     return (
         <>
             <div className="flex flex-row items-center justify-between mb-2">
-                <h2 className="text-2xl font-semibold mt-2 mb-2 text-left">Connected robots</h2>
+                <h2 className="text-2xl font-semibold mt-2 mb-2 text-left">Robots</h2>
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
                         <Button className="rounded-full w-fit">Add robot</Button>

@@ -1,5 +1,6 @@
 import ConnectedCameras from "./ConnectedCameras";
 import ConnectedRobots from "./ConnectedRobots";
+import { TokenConfig } from "./TokenConfig";
 import { PortInfo } from "@/types/serial";
 import { MediaDevice, ActiveCamera } from "@/types/camera";
 import { RefObject } from "react";
@@ -129,15 +130,16 @@ function Setup({ ports, onConnectRobot, activeCameras, streamsRef, onStartCamera
     // }, []);
 
     return (
-        <>
+        <div className="space-y-6">
+            <TokenConfig />
             <ConnectedRobots ports={ports} onConnectRobot={onConnectRobot} />
             <ConnectedCameras 
                 activeCameras={activeCameras} 
                 streamsRef={streamsRef} 
                 onStartCamera={onStartCamera} 
             />
-        </>
-      );
-    }
-    
+        </div>
+    );
+}
+
 export default Setup;

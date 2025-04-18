@@ -69,7 +69,7 @@ function ConnectedCameras({ activeCameras, streamsRef, onStartCamera }: Connecte
     return (
         <>
             <div className="flex flex-row items-center justify-between mb-2">
-                <h2 className="text-2xl font-semibold mt-2 mb-2 text-left">Connected cameras</h2>
+                <h2 className="text-2xl font-semibold mt-2 mb-2 text-left">Cameras</h2>
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
                         <Button onClick={listConnectedCameras} className="rounded-full w-fit">
