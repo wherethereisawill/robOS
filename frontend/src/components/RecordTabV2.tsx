@@ -2,7 +2,7 @@ import ListDatasets from "./ListDatasets";
 import ListEpisodes from "./ListEpisodes";
 import { getToken } from "@/utils/token";
 
-export function RecordTabV2() {
+function RecordTabV2() {
     const token = getToken();
 
     if (!token) {
@@ -26,3 +26,5 @@ export function RecordTabV2() {
         </div>
     );
 }
+
+export default RecordTabV2;
